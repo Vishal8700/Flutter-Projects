@@ -1,0 +1,476 @@
+https://fluttertravellingapp-default-rtdb.firebaseio.com/ this is url 
+
+import 'dart:io';
+
+import 'package:uuid/uuid.dart';
+
+const uuid = Uuid();
+
+class PlaceLocation {
+  const PlaceLocation(
+      {required this.address, required this.latitude, required this.longitude});
+  final double latitude;
+  final double longitude;
+  final String address;
+}
+
+class Place {
+  Place({required this.title, required this.image, required this.location})
+      : id = uuid.v4();
+  final String id;
+  final String title;
+  final File image;
+  final PlaceLocation location;
+}
+this is place.dart
+import 'dart:io';
+
+import 'package:favorite_place_app/models/place.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class UserPlacesNotifier extends StateNotifier<List<Place>> {
+  UserPlacesNotifier() : super(const []);
+
+  void addPlace(String title, File image, PlaceLocation location) {
+    final newPlace = Place(
+      title: title,
+      image: image,
+      location: location,
+    );
+    state = [...state, newPlace];
+  }
+}
+
+final userPlacesProvider =
+    StateNotifierProvider<UserPlacesNotifier, List<Place>>(
+        (ref) => UserPlacesNotifier());
+this is user provideo
+
+import 'dart:io';
+
+import 'package:favorite_place_app/provider/user_places.dart';
+import 'package:favorite_place_app/widgets/image_input.dart';
+import 'package:favorite_place_app/widgets/location_input.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:favorite_place_app/models/place.dart';
+
+class AddPlaceScreen extends ConsumerStatefulWidget {
+  const AddPlaceScreen({super.key});
+
+  @override
+  ConsumerState<AddPlaceScreen> createState() => _AddPlaceScreenState();
+}
+
+class _AddPlaceScreenState extends ConsumerState<AddPlaceScreen> {
+  final _titleController = TextEditingController();
+  File? _selectedImage;
+  PlaceLocation? _selectedLocation; // Added to store location
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
+
+  void _savePlace() {
+    final enteredTitle = _titleController.text;
+    if (enteredTitle.isEmpty ||
+        _selectedImage == null ||
+        _selectedLocation == null) {
+      return;
+    }
+    ref
+        .read(userPlacesProvider.notifier)
+        .addPlace(enteredTitle, _selectedImage!, _selectedLocation!);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Add Place'),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            TextField(
+              decoration: const InputDecoration(
+                hintText: 'Enter Place Name',
+                hintStyle: TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(20.0)),
+                ),
+              ),
+              controller: _titleController,
+              style: const TextStyle(color: Color.fromARGB(255, 255, 255, 255)),
+            ),
+            const SizedBox(
+              height: 10,
+            ),
+            ImageInput(
+              onPickImage: (image) {
+                _selectedImage = image;
+              },
+            ),
+            const SizedBox(
+              height: 10,
+            ),
+            LocationInput(
+              onSelectLocation: (location) {
+                _selectedLocation = location;
+              },
+            ),
+            const SizedBox(
+              height: 10,
+            ),
+            ElevatedButton.icon(
+              onPressed: _savePlace,
+              icon: const Icon(Icons.add),
+              label: const Text('Add Place'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+this is add prlce dart
+
+import 'package:favorite_place_app/models/place.dart';
+import 'package:flutter/material.dart';
+
+class PlacesDetailsScreen extends StatelessWidget {
+  const PlacesDetailsScreen({super.key, required this.place});
+
+  final Place place;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+        appBar: AppBar(
+          title: Text(
+            place.title,
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium!
+                .copyWith(color: Theme.of(context).colorScheme.onSurface),
+          ),
+        ),
+        body: Stack(children: [
+          Image.file(
+            place.image,
+            fit: BoxFit.cover,
+            height: double.infinity,
+            width: double.infinity,
+          )
+        ]));
+  }
+}
+this is place details,dart
+
+import 'package:favorite_place_app/provider/user_places.dart';
+import 'package:favorite_place_app/screens/add_place.dart';
+import 'package:favorite_place_app/widgets/places_list.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+class PlacesScreen extends ConsumerWidget {
+  const PlacesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final userPlaces = ref.watch(userPlacesProvider); // Updated provider name
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Places'),
+        actions: [
+          IconButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (ctx) => const AddPlaceScreen(),
+                ),
+              );
+            },
+            icon: const Icon(Icons.add),
+          ),
+        ],
+      ),
+      body: PlacesList(places: userPlaces),
+    );
+  }
+}
+this is places.dart
+
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+
+class ImageInput extends StatefulWidget {
+  const ImageInput({super.key, required this.onPickImage});
+
+  final void Function(File image) onPickImage;
+
+  @override
+  State<ImageInput> createState() => _ImageInputState();
+}
+
+class _ImageInputState extends State<ImageInput> {
+  File? _selectedImage;
+  void _takeImage() async {
+    final imagePicker = ImagePicker();
+    final pickedImage = await imagePicker.pickImage(source: ImageSource.camera);
+    if (pickedImage == null) {
+      return;
+    }
+    setState(() {
+      _selectedImage = File(pickedImage.path);
+    });
+    widget.onPickImage(_selectedImage!);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Widget content = TextButton.icon(
+        onPressed: _takeImage,
+        icon: const Icon(Icons.camera),
+        label: const Text('Add Image'),
+        style: TextButton.styleFrom(
+            iconColor: Color.fromARGB(255, 255, 255, 255)));
+
+    if (_selectedImage != null) {
+      content = Container(
+        decoration: BoxDecoration(
+            border: Border.all(width: 10, color: Color.fromARGB(255, 0, 0, 0)),
+            borderRadius: BorderRadius.circular(60)),
+        child: Image.file(
+          _selectedImage!,
+          width: double.infinity,
+          height: double.infinity,
+          fit: BoxFit.cover,
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: Colors.black.withOpacity(0.3),
+          width: 1,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      width: double.infinity,
+      height: 300,
+      alignment: Alignment.center,
+      child: content,
+    );
+  }
+}
+this is image input widget 
+
+import 'dart:convert';
+import 'dart:io'; // Import this for File class
+import 'package:flutter/material.dart';
+import 'package:location/location.dart';
+import 'package:http/http.dart' as http;
+import 'package:favorite_place_app/models/place.dart'; // Import your models
+
+class LocationInput extends StatefulWidget {
+  const LocationInput(
+      {super.key, required Null Function(dynamic location) onSelectLocation});
+
+  @override
+  State<LocationInput> createState() => _LocationInputState();
+}
+
+class _LocationInputState extends State<LocationInput> {
+  Place? _selectedPlace; // Change to use Place class
+  bool _isLoading = false; // Track loading state
+
+  final Location location = Location();
+  final String apiKey = '66a379374df46443849231agtf945f4'; // Your API key
+
+  Future<void> _getCurrentLocation() async {
+    bool _serviceEnabled;
+    PermissionStatus _permissionGranted;
+
+    // Set loading to true
+    setState(() {
+      _isLoading = true;
+    });
+
+    // Check if location services are enabled
+    _serviceEnabled = await location.serviceEnabled();
+    if (!_serviceEnabled) {
+      _serviceEnabled = await location.requestService();
+      if (!_serviceEnabled) {
+        setState(() {
+          _isLoading = false; // Set loading to false if service is not enabled
+        });
+        return;
+      }
+    }
+
+    // Check for location permissions
+    _permissionGranted = await location.hasPermission();
+    if (_permissionGranted == PermissionStatus.denied) {
+      _permissionGranted = await location.requestPermission();
+      if (_permissionGranted != PermissionStatus.granted) {
+        setState(() {
+          _isLoading =
+              false; // Set loading to false if permission is not granted
+        });
+        return;
+      }
+    }
+
+    // Get the current location
+    final LocationData _locationResult = await location.getLocation();
+
+    // Get the address from the coordinates
+    final address = await _getAddressFromLatLng(
+        _locationResult.latitude, _locationResult.longitude);
+
+    setState(() {
+      _selectedPlace = Place(
+        title: 'Current Location',
+        image: File(''), // Placeholder for image file
+        location: PlaceLocation(
+          address: address,
+          latitude: _locationResult.latitude!,
+          longitude: _locationResult.longitude!,
+        ),
+      );
+      _isLoading = false; // Set loading to false after fetching is complete
+    });
+  }
+
+  Future<String> _getAddressFromLatLng(double? lat, double? lng) async {
+    if (lat == null || lng == null) return 'Address not found';
+
+    final url = Uri.parse(
+        'https://geocode.maps.co/reverse?lat=$lat&lon=$lng&api_key=$apiKey');
+
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['display_name'] ?? 'Address not found';
+      } else {
+        print('Failed to load address: ${response.statusCode}');
+        return 'Address not found';
+      }
+    } catch (e) {
+      print('Error fetching address: $e');
+      return 'Address not found';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          height: 170,
+          width: double.infinity,
+          decoration: BoxDecoration(
+              border: Border.all(
+                  width: 1, color: const Color.fromARGB(61, 0, 0, 0)),
+              borderRadius: BorderRadius.circular(5)),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.all(10),
+          child: _isLoading
+              ? const CircularProgressIndicator() // Show progress indicator while loading
+              : Text(
+                  _selectedPlace?.location.address ?? 'Enter a location',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    color: Color.fromARGB(255, 255, 255, 255),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            TextButton.icon(
+              icon: const Icon(Icons.my_location),
+              label: const Text('Device Location'),
+              style: TextButton.styleFrom(
+                iconColor: const Color.fromARGB(255, 255, 0, 0),
+              ),
+              onPressed: _getCurrentLocation,
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.map),
+              label: const Text('Select Location from Map'),
+              style: TextButton.styleFrom(
+                iconColor: const Color.fromARGB(255, 47, 255, 0),
+              ),
+              onPressed: () {
+                // Add your map location functionality here
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+this is location input widget 
+import 'package:favorite_place_app/models/place.dart';
+import 'package:favorite_place_app/screens/places_details.dart';
+import 'package:flutter/material.dart';
+
+class PlacesList extends StatelessWidget {
+  const PlacesList({super.key, required this.places});
+
+  final List<Place> places;
+
+  @override
+  Widget build(BuildContext context) {
+    if (places.isEmpty) {
+      return Center(
+        child: Text(
+          'No places yet',
+          style: Theme.of(context)
+              .textTheme
+              .bodyLarge!
+              .copyWith(color: Theme.of(context).colorScheme.onSurface),
+        ),
+      );
+    }
+    return ListView.builder(
+      itemCount: places.length,
+      itemBuilder: (ctx, index) => ListTile(
+        leading: CircleAvatar(
+          radius: 26,
+          backgroundImage: FileImage(places[index].image),
+        ),
+        title: Text(
+          places[index].title,
+          style: Theme.of(context)
+              .textTheme
+              .titleMedium!
+              .copyWith(color: Theme.of(context).colorScheme.onSurface),
+        ),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (ctx) => PlacesDetailsScreen(
+                place: places[index],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+this is place list .dart 
